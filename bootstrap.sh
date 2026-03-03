@@ -36,7 +36,12 @@ echo "  Image:    ${DOCKER_IMAGE}"
 echo "  Bridge:   ${BRIDGE_URL:0:60}..."
 echo "============================================"
 
-# --- Pull latest harness ---
+# --- Clean up stale images to ensure fresh code ---
+echo "Cleaning stale images..."
+docker rmi knobert:live 2>/dev/null || true
+docker rmi "${DOCKER_IMAGE}" 2>/dev/null || true
+
+# --- Pull latest harness (always fresh) ---
 echo "Pulling latest harness image..."
 docker pull "${DOCKER_IMAGE}"
 
@@ -51,6 +56,7 @@ echo "Starting worker loop..."
 while true; do
   docker rm -f "${INSTANCE_ID}" 2>/dev/null || true
 
+  # Mount only data dirs, NOT the entire home (code comes from image)
   docker run --rm \
     --name "${INSTANCE_ID}" \
     -e KNOBERT_ROLE=worker \
@@ -59,7 +65,8 @@ while true; do
     -e GAS_BRIDGE_KEY="${BRIDGE_KEY}" \
     -e PYTHONUNBUFFERED=1 \
     ${MODEL:+-e WORKER_MODEL="${MODEL}"} \
-    -v knobert-home:/home/knobert \
+    -v knobert-tasks:/home/knobert/projects/tasks \
+    -v knobert-data:/home/knobert/data \
     --tmpfs /tmp:size=512m \
     knobert:live \
     || true
@@ -74,10 +81,13 @@ while true; do
     BRIDGE_URL="$NEW_URL"
   fi
 
-  # Pull latest image on restart
-  echo "Pulling latest image..."
+  # Clean and rebuild on restart (always fresh code)
+  echo "Rebuilding with latest image..."
+  docker rmi knobert:live 2>/dev/null || true
+  docker rmi "${DOCKER_IMAGE}" 2>/dev/null || true
   docker pull "${DOCKER_IMAGE}" || true
-  docker run --rm "${DOCKER_IMAGE}" --role worker > /tmp/knobert-df-$$ 2>/dev/null && \
-    docker build -t knobert:live -f /tmp/knobert-df-$$ . 2>/dev/null && \
-    rm -f /tmp/knobert-df-$$ || true
+  BUILD_DIR=$(mktemp -d)
+  docker run --rm "${DOCKER_IMAGE}" --role worker > "${BUILD_DIR}/Dockerfile" 2>/dev/null && \
+    docker build --no-cache -t knobert:live "${BUILD_DIR}/" 2>/dev/null && \
+    rm -rf "${BUILD_DIR}" || true
 done
