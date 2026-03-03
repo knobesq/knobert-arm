@@ -13,6 +13,7 @@
 set -euo pipefail
 
 BRIDGE_KEY="${BRIDGE_KEY:?ERROR: Set BRIDGE_KEY environment variable}"
+ROLE="${ROLE:-worker}"  # worker | secondary-head | head
 INSTANCE_ID="${INSTANCE_ID:-knobert-$(hostname | tr '.' '-')-$$}"
 MODEL="${MODEL:-}"
 DOCKER_IMAGE="${DOCKER_IMAGE:-knobesq/knobert-harness:latest}"
@@ -21,6 +22,7 @@ RESTART_DELAY="${RESTART_DELAY:-30}"
 echo "============================================"
 echo "  Knobert Arm Bootstrap"
 echo "  Instance: ${INSTANCE_ID}"
+echo "  Role:     ${ROLE}"
 echo "  Image:    ${DOCKER_IMAGE}"
 echo "============================================"
 
@@ -41,7 +43,7 @@ while true; do
   docker run --rm \
     --name "${INSTANCE_ID}" \
     -e GAS_BRIDGE_KEY="${BRIDGE_KEY}" \
-    -e KNOBERT_ROLE=worker \
+    -e KNOBERT_ROLE="${ROLE}" \
     -e KNOBERT_INSTANCE_ID="${INSTANCE_ID}" \
     -e PYTHONUNBUFFERED=1 \
     ${MODEL:+-e WORKER_MODEL="${MODEL}"} \
