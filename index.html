@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Knobert Arm</title>
+<style>
+  body { font-family: system-ui; background: #0f172a; color: #e2e8f0; max-width: 700px; margin: 40px auto; padding: 20px; }
+  h1 { color: #38bdf8; }
+  code { background: #1e293b; padding: 2px 8px; border-radius: 4px; font-size: 0.9em; }
+  pre { background: #1e293b; padding: 16px; border-radius: 8px; overflow-x: auto; }
+  a { color: #38bdf8; }
+</style>
+</head>
+<body>
+<h1>Knobert Arm Bootstrap</h1>
+<p>Join the octopus with one command:</p>
+<pre>BRIDGE_KEY=your-key bash &lt;(curl -fsSL https://knobesq.github.io/knobert-arm/bootstrap.sh)</pre>
+<p>Options:</p>
+<ul>
+  <li><code>BRIDGE_KEY</code> — (required) your bridge authentication key</li>
+  <li><code>INSTANCE_ID</code> — custom name for this arm (default: auto-generated)</li>
+  <li><code>MODEL</code> — preferred model: haiku, sonnet (default: auto)</li>
+  <li><code>DOCKER_IMAGE</code> — custom harness image (default: knobesq/knobert-harness:latest)</li>
+</ul>
+<p>The bootstrap script discovers the GAS bridge URL automatically. On restart, it pulls the latest image and checks for URL updates.</p>
+<p><a href="https://github.com/knobesq/knobert-arm">Source on GitHub</a></p>
+</body>
+</html>
