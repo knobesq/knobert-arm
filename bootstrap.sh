@@ -56,7 +56,7 @@ echo "Starting worker loop..."
 while true; do
   docker rm -f "${INSTANCE_ID}" 2>/dev/null || true
 
-  # Mount only data dirs, NOT the entire home (code comes from image)
+  # Fully ephemeral — no volumes. Tasks from Sheet, results to Sheet.
   docker run --rm \
     --name "${INSTANCE_ID}" \
     -e KNOBERT_ROLE=worker \
@@ -65,8 +65,6 @@ while true; do
     -e GAS_BRIDGE_KEY="${BRIDGE_KEY}" \
     -e PYTHONUNBUFFERED=1 \
     ${MODEL:+-e WORKER_MODEL="${MODEL}"} \
-    -v knobert-tasks:/home/knobert/projects/tasks \
-    -v knobert-data:/home/knobert/data \
     --tmpfs /tmp:size=512m \
     knobert:live \
     || true
