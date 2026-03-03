@@ -43,7 +43,7 @@ docker pull "${DOCKER_IMAGE}"
 # --- Build live image from harness output ---
 BUILD_DIR=$(mktemp -d)
 docker run --rm "${DOCKER_IMAGE}" --role worker > "${BUILD_DIR}/Dockerfile"
-docker build -t knobert:live "${BUILD_DIR}/"
+docker build --no-cache -t knobert:live "${BUILD_DIR}/"
 rm -rf "${BUILD_DIR}"
 
 # --- Run worker loop (auto-restart on exit) ---
@@ -57,6 +57,7 @@ while true; do
     -e KNOBERT_INSTANCE_ID="${INSTANCE_ID}" \
     -e GAS_BRIDGE_URL="${BRIDGE_URL}" \
     -e GAS_BRIDGE_KEY="${BRIDGE_KEY}" \
+    -e PYTHONUNBUFFERED=1 \
     ${MODEL:+-e WORKER_MODEL="${MODEL}"} \
     -v knobert-home:/home/knobert \
     --tmpfs /tmp:size=512m \
