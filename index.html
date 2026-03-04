@@ -2,27 +2,50 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Knobert Arm</title>
+<title>Knobert Armstrap</title>
 <style>
   body { font-family: system-ui; background: #0f172a; color: #e2e8f0; max-width: 700px; margin: 40px auto; padding: 20px; }
   h1 { color: #38bdf8; }
+  h2 { color: #38bdf8; font-size: 1.2em; margin-top: 2em; }
   code { background: #1e293b; padding: 2px 8px; border-radius: 4px; font-size: 0.9em; }
   pre { background: #1e293b; padding: 16px; border-radius: 8px; overflow-x: auto; }
   a { color: #38bdf8; }
+  .mode { border-left: 3px solid #38bdf8; padding-left: 12px; margin: 16px 0; }
 </style>
 </head>
 <body>
-<h1>Knobert Arm Bootstrap</h1>
-<p>Join the octopus with one command:</p>
-<pre>BRIDGE_KEY=your-key bash &lt;(curl -fsSL https://knobesq.github.io/knobert-arm/bootstrap.sh)</pre>
-<p>Options:</p>
+<h1>Knobert Armstrap</h1>
+<p>Join the octopus with one command.</p>
+
+<h2>Docker Mode (default)</h2>
+<div class="mode">
+<p>Runs in a container. Pulls from ghcr.io (primary) or Docker Hub (fallback).</p>
+<pre>BRIDGE_KEY=key bash &lt;(curl -fsSL https://knobesq.github.io/knobert-arm/armstrap.sh)</pre>
+</div>
+
+<h2>Bare-Metal Mode</h2>
+<div class="mode">
+<p>No Docker needed. Clones the repo and runs Python directly.</p>
+<pre>BRIDGE_KEY=key MODE=bare bash &lt;(curl -fsSL https://knobesq.github.io/knobert-arm/armstrap.sh)</pre>
+</div>
+
+<h2>Options</h2>
 <ul>
-  <li><code>BRIDGE_KEY</code> — (required) your bridge authentication key</li>
+  <li><code>BRIDGE_KEY</code> — (required) bridge authentication key</li>
+  <li><code>MODE</code> — <code>docker</code> (default) or <code>bare</code></li>
+  <li><code>ROLE</code> — <code>worker</code> (default), <code>secondary-head</code>, or <code>head</code></li>
   <li><code>INSTANCE_ID</code> — custom name for this arm (default: auto-generated)</li>
   <li><code>MODEL</code> — preferred model: haiku, sonnet (default: auto)</li>
-  <li><code>DOCKER_IMAGE</code> — custom harness image (default: knobesq/knobert-harness:latest)</li>
 </ul>
-<p>The bootstrap script discovers the GAS bridge URL automatically. On restart, it pulls the latest image and checks for URL updates.</p>
+
+<h2>Features</h2>
+<ul>
+  <li>Exponential backoff on failures (no more crash-pull-crash loops)</li>
+  <li>Dual registry: ghcr.io (no rate limits) + Docker Hub fallback</li>
+  <li>Bare-metal mode auto-discovers MQTT, bridge URL, and GitHub token</li>
+  <li>Auto-updates code on restart (git pull / image pull)</li>
+</ul>
+
 <p><a href="https://github.com/knobesq/knobert-arm">Source on GitHub</a></p>
 </body>
 </html>
