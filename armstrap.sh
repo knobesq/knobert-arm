@@ -120,13 +120,18 @@ run_bare() {
 
   echo "[bare] Fetching configuration from bridge..."
   local CONFIG
-  CONFIG=$(curl -sL "${BRIDGE_URL}" \
+  # NOTE: GAS web apps redirect GET→HTML (doGet). Must use -X POST to hit doPost.
+  # Also -L follows the 302 to the JSON response.
+  CONFIG=$(curl -sL -X POST "${BRIDGE_URL}" \
     -H "Content-Type: application/json" \
     -d "{\"action\":\"config.get\",\"key\":\"${BRIDGE_KEY}\"}" 2>/dev/null || echo "{}")
 
-  # Extract GitHub token for private repo clone
+  # Extract GitHub token — nested under "config" key in bridge response
   local GITHUB_TOKEN
-  GITHUB_TOKEN=$(echo "${CONFIG}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('GITHUB_TOKEN',''))" 2>/dev/null || echo "")
+  GITHUB_TOKEN=$(echo "${CONFIG}" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+print(d.get('config',{}).get('GITHUB_TOKEN', d.get('GITHUB_TOKEN','')))" 2>/dev/null || echo "")
 
   # Clone or update the repo
   if [ -d "${KNOBERT_DIR}/.git" ]; then
@@ -147,10 +152,14 @@ run_bare() {
   echo "${BRIDGE_URL}" > lib/gas-bridge-url.txt
   echo "${BRIDGE_KEY}" > lib/gas-bridge-key.txt
 
-  # Extract MQTT credentials from config
+  # Extract MQTT credentials from config (nested under "config" key)
   for key in KNOBERT_MQTT_HOST KNOBERT_MQTT_USER KNOBERT_MQTT_PASS; do
     local val
-    val=$(echo "${CONFIG}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('${key}',''))" 2>/dev/null || echo "")
+    val=$(echo "${CONFIG}" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+c=d.get('config',d)
+print(c.get('${key}',''))" 2>/dev/null || echo "")
     if [ -n "${val}" ]; then
       local fname
       case "${key}" in
