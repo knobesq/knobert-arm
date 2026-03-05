@@ -13,7 +13,7 @@
 # ============================================================
 set -euo pipefail
 
-ARMSTRAP_VERSION="2026.03.05.5"  # Bump this on every change
+ARMSTRAP_VERSION="2026.03.05.6"  # Bump this on every change
 
 BRIDGE_KEY="${BRIDGE_KEY:?ERROR: Set BRIDGE_KEY environment variable}"
 MODE="${MODE:-docker}"  # docker | bare
@@ -213,20 +213,71 @@ print(c.get('GROQ_API_KEY',''))" 2>/dev/null || echo "")
     echo "[bare] Groq API key provisioned"
   fi
 
+  # ── Ensure PATH includes user-local bins ────────────────────────
+  export PATH="${HOME}/.local/bin:${HOME}/.npm-global/bin:/usr/local/bin:${PATH}"
+
   # ── Install Python dependencies ────────────────────────────────
   # Ubuntu 24.04 uses PEP 668 "externally managed" Python — try --user first, then
   # --break-system-packages as a fallback. Either way, never let a pip failure stop startup.
   echo "[bare] Installing Python dependencies..."
   python3 -c "import paho.mqtt" 2>/dev/null || \
-    pip3 install paho-mqtt --user --quiet 2>/dev/null || \
-    pip3 install paho-mqtt --break-system-packages --quiet 2>/dev/null || \
+    python3 -m pip install paho-mqtt --user --quiet 2>/dev/null || \
+    python3 -m pip install paho-mqtt --break-system-packages --quiet 2>/dev/null || \
     true
 
-  # Also install markdown for email beautifier
   python3 -c "import markdown" 2>/dev/null || \
-    pip3 install markdown --user --quiet 2>/dev/null || \
-    pip3 install markdown --break-system-packages --quiet 2>/dev/null || \
+    python3 -m pip install markdown --user --quiet 2>/dev/null || \
+    python3 -m pip install markdown --break-system-packages --quiet 2>/dev/null || \
     true
+
+  # ── Install Claude Code (the task executor) ────────────────────
+  # Workers execute tasks via `claude -p`. Install if missing.
+  if ! command -v claude &>/dev/null; then
+    echo "[bare] Claude Code not found. Installing..."
+    # Need Node.js first
+    if ! command -v node &>/dev/null; then
+      echo "[bare] Installing Node.js..."
+      if command -v apt-get &>/dev/null; then
+        # Ubuntu/Debian: install via NodeSource
+        curl -fsSL https://deb.nodesource.com/setup_22.x 2>/dev/null | sudo -n bash - 2>/dev/null || true
+        sudo -n apt-get install -y nodejs 2>/dev/null || true
+      fi
+    fi
+    if command -v npm &>/dev/null; then
+      echo "[bare] Installing Claude Code via npm..."
+      npm install -g @anthropic-ai/claude-code 2>/dev/null || \
+        sudo -n npm install -g @anthropic-ai/claude-code 2>/dev/null || \
+        { mkdir -p "${HOME}/.npm-global" && \
+          npm config set prefix "${HOME}/.npm-global" && \
+          npm install -g @anthropic-ai/claude-code 2>/dev/null; } || \
+        true
+    fi
+    if command -v claude &>/dev/null; then
+      echo "[bare] Claude Code installed: $(claude --version 2>/dev/null || echo 'unknown version')"
+    else
+      echo "[bare] WARNING: Claude Code not available — tasks will fail"
+    fi
+  else
+    echo "[bare] Claude Code: $(claude --version 2>/dev/null || echo 'present')"
+  fi
+
+  # ── Propagate Bedrock credentials for Claude Code ──────────────
+  # Claude Code on arms uses Bedrock via the pay-i proxy, same as the head.
+  # Extract from bridge config if available.
+  for key in ANTHROPIC_BEDROCK_BASE_URL ANTHROPIC_CUSTOM_HEADERS \
+             CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_SKIP_BEDROCK_AUTH \
+             ANTHROPIC_DEFAULT_HAIKU_MODEL ANTHROPIC_DEFAULT_SONNET_MODEL; do
+    local val
+    val=$(echo "${CONFIG}" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+c=d.get('config',d)
+print(c.get('${key}',''))" 2>/dev/null || echo "")
+    if [ -n "${val}" ]; then
+      export "${key}=${val}"
+      echo "[bare] ${key} configured"
+    fi
+  done
 
   echo "[bare] Starting as ${ROLE}..."
   export KNOBERT_ROLE="${ROLE}"
@@ -235,15 +286,31 @@ print(c.get('GROQ_API_KEY',''))" 2>/dev/null || echo "")
   export GAS_BRIDGE_URL="${BRIDGE_URL}"
   export GAS_BRIDGE_KEY="${BRIDGE_KEY}"
 
+  # ── Signal handling: forward to child, clean exit ──────────────
+  CHILD_PID=""
+  cleanup() {
+    echo "[$(date)] Shutting down (signal received)..."
+    [ -n "${CHILD_PID}" ] && kill "${CHILD_PID}" 2>/dev/null
+    wait "${CHILD_PID}" 2>/dev/null
+    exit 0
+  }
+  trap cleanup SIGINT SIGTERM
+
   # Dispatch based on role — worker runs the task poller, head runs the daemon.
   # One brain, many tentacles. Arms sense and execute, they don't think.
   case "${ROLE}" in
     worker)
       while true; do
         echo "[$(date)] Starting worker..."
-        python3 lib/knobert-worker.py || true
+        python3 lib/knobert-worker.py &
+        CHILD_PID=$!
+        wait "${CHILD_PID}" || true
+        CHILD_PID=""
         echo "[$(date)] Worker exited. Restarting in ${RESTART_DELAY}s..."
-        sleep "${RESTART_DELAY}"
+        sleep "${RESTART_DELAY}" &
+        CHILD_PID=$!
+        wait "${CHILD_PID}" 2>/dev/null || true
+        CHILD_PID=""
         git pull --ff-only 2>/dev/null || true
       done
       ;;
@@ -252,9 +319,15 @@ print(c.get('GROQ_API_KEY',''))" 2>/dev/null || echo "")
       [ "${ROLE}" = "secondary-head" ] && export KNOBERT_HEAD_MODE="secondary"
       while true; do
         echo "[$(date)] Starting daemon (${ROLE})..."
-        python3 lib/knobert-daemon.py || true
+        python3 lib/knobert-daemon.py &
+        CHILD_PID=$!
+        wait "${CHILD_PID}" || true
+        CHILD_PID=""
         echo "[$(date)] Daemon exited. Restarting in ${RESTART_DELAY}s..."
-        sleep "${RESTART_DELAY}"
+        sleep "${RESTART_DELAY}" &
+        CHILD_PID=$!
+        wait "${CHILD_PID}" 2>/dev/null || true
+        CHILD_PID=""
         git pull --ff-only 2>/dev/null || true
       done
       ;;
