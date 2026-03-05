@@ -13,6 +13,8 @@
 # ============================================================
 set -euo pipefail
 
+ARMSTRAP_VERSION="2026.03.05.2"  # Bump this on every change
+
 BRIDGE_KEY="${BRIDGE_KEY:?ERROR: Set BRIDGE_KEY environment variable}"
 MODE="${MODE:-docker}"  # docker | bare
 ROLE="${ROLE:-worker}"  # worker | secondary-head | head
@@ -30,11 +32,15 @@ BACKOFF_FILE="/tmp/knobert-armstrap-backoff"
 MAX_BACKOFF=3600  # 1 hour cap
 
 echo "============================================"
-echo "  Knobert Armstrap"
+echo "  Knobert Armstrap v${ARMSTRAP_VERSION}"
 echo "  Instance: ${INSTANCE_ID}"
 echo "  Role:     ${ROLE}"
 echo "  Mode:     ${MODE}"
 [ "${MODE}" = "docker" ] && echo "  Image:    ${DOCKER_IMAGE}"
+echo "  OS:       $(uname -s -r 2>/dev/null || echo unknown)"
+echo "  Python:   $(python3 --version 2>/dev/null || echo missing)"
+echo "  User:     $(whoami)@$(hostname)"
+echo "  Home:     ${HOME}"
 echo "============================================"
 
 # --- Exponential backoff helpers ---
