@@ -13,7 +13,7 @@
 # ============================================================
 set -euo pipefail
 
-ARMSTRAP_VERSION="2026.03.05.6"  # Bump this on every change
+ARMSTRAP_VERSION="2026.03.05.7"  # Bump this on every change
 
 BRIDGE_KEY="${BRIDGE_KEY:?ERROR: Set BRIDGE_KEY environment variable}"
 MODE="${MODE:-docker}"  # docker | bare
@@ -114,8 +114,16 @@ have_image() {
 # BARE-METAL MODE — no Docker, just git clone + python3
 # ============================================================
 run_bare() {
+  # Always work from home dir — avoids slow /mnt/c on WSL2
+  cd "${HOME}"
+
   local KNOBERT_DIR="${HOME}/knobert"
   local BRIDGE_URL
+
+  # Prefer IPv4 over IPv6 (WSL2 IPv6 can be flaky)
+  if ! grep -q 'precedence ::ffff:0:0/96 100' /etc/gai.conf 2>/dev/null; then
+    echo 'precedence ::ffff:0:0/96 100' | sudo -n tee -a /etc/gai.conf >/dev/null 2>&1 || true
+  fi
 
   echo "[bare] Discovering bridge URL..."
   BRIDGE_URL=$(curl -fsSL https://knobesq.github.io/knobert-arm/bridge-url.txt 2>/dev/null || echo "")

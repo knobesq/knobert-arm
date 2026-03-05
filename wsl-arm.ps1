@@ -13,6 +13,8 @@
 #   4. Creates a "knobert" user inside the distro
 #   5. Runs the armstrap (which installs everything and starts the worker)
 
+$WSL_ARM_VERSION = "2026.03.05.1"
+
 param(
     [string]$BridgeKey = $env:KNOBERT_KEY,
     [string]$InstallDir = "$env:USERPROFILE\WSL\Knobert",
@@ -26,7 +28,7 @@ if (-not $BridgeKey) {
 }
 
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "  Knobert WSL Arm Bootstrap" -ForegroundColor Cyan
+Write-Host "  Knobert WSL Arm Bootstrap v$WSL_ARM_VERSION" -ForegroundColor Cyan
 Write-Host "  Distro:  $DistroName" -ForegroundColor Cyan
 Write-Host "  Install: $InstallDir" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
@@ -63,7 +65,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Step 4: Create knobert user and configure
+# Step 4: Create knobert user and configure the distro
 Write-Host "[4/5] Setting up user and environment..." -ForegroundColor Yellow
 wsl -d $DistroName -- bash -c @"
 set -e
@@ -74,11 +76,13 @@ if ! id knobert &>/dev/null; then
 fi
 # Set default user for the distro
 echo -e '[user]\ndefault=knobert' > /etc/wsl.conf
+# Prefer IPv4 over IPv6 (WSL2 IPv6 can be flaky, causes 'Network unreachable')
+echo 'precedence ::ffff:0:0/96 100' >> /etc/gai.conf
 # Install basics
 apt-get update -qq && apt-get install -y -qq curl git python3 python3-pip sudo >/dev/null 2>&1
 "@
 
-# Step 5: Run armstrap as knobert user
+# Step 5: Run armstrap as knobert user (cd ~ to avoid slow /mnt/c path)
 Write-Host "[5/5] Starting Knobert arm worker..." -ForegroundColor Green
 Write-Host ""
-wsl -d $DistroName -u knobert -- bash -c "export BRIDGE_KEY='$BridgeKey'; export MODE=bare; bash <(curl -fsSL https://raw.githubusercontent.com/knobesq/knobert-arm/main/armstrap.sh)"
+wsl -d $DistroName -u knobert -- bash -c "cd ~ && export BRIDGE_KEY='$BridgeKey' && export MODE=bare && bash <(curl -fsSL https://raw.githubusercontent.com/knobesq/knobert-arm/main/armstrap.sh)"
