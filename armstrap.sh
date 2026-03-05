@@ -120,11 +120,13 @@ run_bare() {
 
   echo "[bare] Fetching configuration from bridge..."
   local CONFIG
-  # NOTE: GAS web apps redirect GET→HTML (doGet). Must use -X POST to hit doPost.
-  # Also -L follows the 302 to the JSON response.
-  CONFIG=$(curl -sL -X POST "${BRIDGE_URL}" \
+  # NOTE: GAS web apps redirect GET→HTML (doGet), POST goes to doPost.
+  # Do NOT use -X POST — it causes curl to reissue the redirect as GET (RFC 2616).
+  # Using -d alone is enough: curl infers POST from the body AND keeps POST through
+  # the 302 redirect to script.googleusercontent.com.
+  CONFIG=$(curl -sL "${BRIDGE_URL}" \
     -H "Content-Type: application/json" \
-    -d "{\"action\":\"config.get\",\"key\":\"${BRIDGE_KEY}\"}" 2>/dev/null || echo "{}")
+    --data "{\"action\":\"config.get\",\"key\":\"${BRIDGE_KEY}\"}" 2>/dev/null || echo "{}")
 
   # Extract GitHub token — nested under "config" key in bridge response
   local GITHUB_TOKEN
