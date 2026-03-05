@@ -174,7 +174,12 @@ print(c.get('${key}',''))" 2>/dev/null || echo "")
   done
 
   # Install Python dependencies if needed
-  python3 -c "import paho.mqtt" 2>/dev/null || pip3 install paho-mqtt --quiet 2>/dev/null || true
+  # Ubuntu 24.04 uses PEP 668 "externally managed" Python — try --user first, then
+  # --break-system-packages as a fallback. Either way, never let a pip failure stop startup.
+  python3 -c "import paho.mqtt" 2>/dev/null || \
+    pip3 install paho-mqtt --user --quiet 2>/dev/null || \
+    pip3 install paho-mqtt --break-system-packages --quiet 2>/dev/null || \
+    true
 
   echo "[bare] Starting ${ROLE} daemon..."
   export KNOBERT_ROLE="${ROLE}"
