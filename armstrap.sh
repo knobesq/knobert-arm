@@ -13,7 +13,7 @@
 # ============================================================
 set -euo pipefail
 
-ARMSTRAP_VERSION="2026.03.05.2"  # Bump this on every change
+ARMSTRAP_VERSION="2026.03.05.3"  # Bump this on every change
 
 BRIDGE_KEY="${BRIDGE_KEY:?ERROR: Set BRIDGE_KEY environment variable}"
 MODE="${MODE:-docker}"  # docker | bare
@@ -232,6 +232,13 @@ print(c.get('GROQ_API_KEY',''))" 2>/dev/null || echo "")
   export KNOBERT_ROLE="${ROLE}"
   export KNOBERT_INSTANCE_ID="${INSTANCE_ID}"
   export PYTHONUNBUFFERED=1
+
+  # Map ROLE to KNOBERT_HEAD_MODE (daemon reads this, not KNOBERT_ROLE)
+  if [ "${ROLE}" = "worker" ] || [ "${ROLE}" = "secondary-head" ]; then
+    export KNOBERT_HEAD_MODE="secondary"
+  else
+    export KNOBERT_HEAD_MODE="primary"
+  fi
 
   while true; do
     echo "[$(date)] Starting daemon (${ROLE})..."
