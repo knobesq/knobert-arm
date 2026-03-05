@@ -150,7 +150,13 @@ print(d.get('config',{}).get('GITHUB_TOKEN', d.get('GITHUB_TOKEN','')))" 2>/dev/
 
   cd "${KNOBERT_DIR}"
 
-  # Write bridge config files
+  # ── Post-clone provisioning ──────────────────────────────────────
+  # The daemon looks for config files at BOTH ~/lib/ and ~/knobert/lib/.
+  # Write to the repo's lib/ AND create ~/lib/ symlinks so paths resolve
+  # regardless of whether HOME/lib or HOME/knobert/lib is referenced.
+  echo "[bare] Provisioning config files..."
+
+  # Write bridge config to repo lib/
   echo "${BRIDGE_URL}" > lib/gas-bridge-url.txt
   echo "${BRIDGE_KEY}" > lib/gas-bridge-key.txt
 
@@ -165,20 +171,55 @@ print(c.get('${key}',''))" 2>/dev/null || echo "")
     if [ -n "${val}" ]; then
       local fname
       case "${key}" in
-        KNOBERT_MQTT_HOST) fname="lib/hivemq-host.txt" ;;
-        KNOBERT_MQTT_USER) fname="lib/hivemq-user.txt" ;;
-        KNOBERT_MQTT_PASS) fname="lib/hivemq-pass.txt" ;;
+        KNOBERT_MQTT_HOST) fname="hivemq-host.txt" ;;
+        KNOBERT_MQTT_USER) fname="hivemq-user.txt" ;;
+        KNOBERT_MQTT_PASS) fname="hivemq-pass.txt" ;;
       esac
-      echo "${val}" > "${fname}"
+      echo "${val}" > "lib/${fname}"
     fi
   done
 
-  # Install Python dependencies if needed
+  # Ensure ~/lib/ exists and has the config files too.
+  # The daemon's gas-bridge.py looks at HOME/lib/, not HOME/knobert/lib/.
+  # If ~/lib is not the repo's lib, symlink or copy the config files there.
+  if [ "${KNOBERT_DIR}/lib" != "${HOME}/lib" ]; then
+    mkdir -p "${HOME}/lib"
+    for cfg in gas-bridge-url.txt gas-bridge-key.txt gas-bridge.py bridge.py \
+               hivemq-host.txt hivemq-user.txt hivemq-pass.txt \
+               groq-api-key.txt neil-sms-gateway.txt; do
+      if [ -f "${KNOBERT_DIR}/lib/${cfg}" ]; then
+        ln -sf "${KNOBERT_DIR}/lib/${cfg}" "${HOME}/lib/${cfg}" 2>/dev/null || \
+          cp -f "${KNOBERT_DIR}/lib/${cfg}" "${HOME}/lib/${cfg}" 2>/dev/null || true
+      fi
+    done
+    echo "[bare] Config files symlinked to ~/lib/"
+  fi
+
+  # Extract and store Groq API key if available
+  local GROQ_KEY
+  GROQ_KEY=$(echo "${CONFIG}" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+c=d.get('config',d)
+print(c.get('GROQ_API_KEY',''))" 2>/dev/null || echo "")
+  if [ -n "${GROQ_KEY}" ]; then
+    echo "${GROQ_KEY}" > lib/groq-api-key.txt
+    echo "[bare] Groq API key provisioned"
+  fi
+
+  # ── Install Python dependencies ────────────────────────────────
   # Ubuntu 24.04 uses PEP 668 "externally managed" Python — try --user first, then
   # --break-system-packages as a fallback. Either way, never let a pip failure stop startup.
+  echo "[bare] Installing Python dependencies..."
   python3 -c "import paho.mqtt" 2>/dev/null || \
     pip3 install paho-mqtt --user --quiet 2>/dev/null || \
     pip3 install paho-mqtt --break-system-packages --quiet 2>/dev/null || \
+    true
+
+  # Also install markdown for email beautifier
+  python3 -c "import markdown" 2>/dev/null || \
+    pip3 install markdown --user --quiet 2>/dev/null || \
+    pip3 install markdown --break-system-packages --quiet 2>/dev/null || \
     true
 
   echo "[bare] Starting ${ROLE} daemon..."
