@@ -13,14 +13,14 @@
 #   4. Creates a "knobert" user inside the distro
 #   5. Runs the armstrap (which installs everything and starts the worker)
 
-$WSL_ARM_VERSION = "2026.03.05.1"
-
 param(
     [string]$BridgeKey = $env:KNOBERT_KEY,
     [string]$InstallDir = "$env:USERPROFILE\WSL\Knobert",
     [string]$DistroName = "Knobert",
     [string]$RootfsUrl = "https://cdimages.ubuntu.com/ubuntu-wsl/noble/daily-live/current/noble-wsl-amd64.wsl"
 )
+
+$WSL_ARM_VERSION = "2026.03.05.2"
 
 if (-not $BridgeKey) {
     Write-Error "Set KNOBERT_KEY or pass -BridgeKey"
