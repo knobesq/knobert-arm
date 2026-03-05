@@ -17,7 +17,7 @@ param(
     [string]$BridgeKey = $env:KNOBERT_KEY,
     [string]$InstallDir = "$env:USERPROFILE\WSL\Knobert",
     [string]$DistroName = "Knobert",
-    [string]$RootfsUrl = "https://cloud-images.ubuntu.com/wsl/noble/current/ubuntu-noble-wsl-amd64-24.04lts.rootfs.tar.gz"
+    [string]$RootfsUrl = "https://cdimages.ubuntu.com/ubuntu-wsl/noble/daily-live/current/noble-wsl-amd64.wsl"
 )
 
 if (-not $BridgeKey) {
@@ -41,18 +41,27 @@ if ($existing) {
 }
 
 # Step 2: Download Ubuntu rootfs
-$rootfsPath = "$env:TEMP\ubuntu-noble-wsl.tar.gz"
+$rootfsPath = "$env:TEMP\noble-wsl-amd64.wsl"
 if (-not (Test-Path $rootfsPath)) {
-    Write-Host "[2/5] Downloading Ubuntu 24.04 rootfs..." -ForegroundColor Yellow
+    Write-Host "[2/5] Downloading Ubuntu 24.04 rootfs (~374MB)..." -ForegroundColor Yellow
     Invoke-WebRequest -Uri $RootfsUrl -OutFile $rootfsPath -UseBasicParsing
+    if (-not (Test-Path $rootfsPath)) {
+        Write-Error "Download failed. Check your internet connection."
+        exit 1
+    }
 } else {
     Write-Host "[2/5] Using cached rootfs at $rootfsPath" -ForegroundColor Green
+    Write-Host "       (delete this file to force re-download)" -ForegroundColor DarkGray
 }
 
 # Step 3: Import as WSL2
 Write-Host "[3/5] Importing as WSL2 distro '$DistroName'..." -ForegroundColor Yellow
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 wsl --import $DistroName $InstallDir $rootfsPath --version 2
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "WSL import failed (exit code $LASTEXITCODE)"
+    exit 1
+}
 
 # Step 4: Create knobert user and configure
 Write-Host "[4/5] Setting up user and environment..." -ForegroundColor Yellow
