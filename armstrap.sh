@@ -13,7 +13,7 @@
 # ============================================================
 set -euo pipefail
 
-ARMSTRAP_VERSION="2026.03.05.4"  # Bump this on every change
+ARMSTRAP_VERSION="2026.03.05.5"  # Bump this on every change
 
 BRIDGE_KEY="${BRIDGE_KEY:?ERROR: Set BRIDGE_KEY environment variable}"
 MODE="${MODE:-docker}"  # docker | bare
@@ -228,26 +228,41 @@ print(c.get('GROQ_API_KEY',''))" 2>/dev/null || echo "")
     pip3 install markdown --break-system-packages --quiet 2>/dev/null || \
     true
 
-  echo "[bare] Starting ${ROLE} daemon..."
+  echo "[bare] Starting as ${ROLE}..."
   export KNOBERT_ROLE="${ROLE}"
   export KNOBERT_INSTANCE_ID="${INSTANCE_ID}"
   export PYTHONUNBUFFERED=1
+  export GAS_BRIDGE_URL="${BRIDGE_URL}"
+  export GAS_BRIDGE_KEY="${BRIDGE_KEY}"
 
-  # Arms are NEVER heads. One brain, many tentacles.
-  # Arms run in worker mode only — they sense and execute, they don't think.
-  export KNOBERT_HEAD_MODE="secondary"
-  export KNOBERT_ROLE="worker"
-
-  while true; do
-    echo "[$(date)] Starting daemon (${ROLE})..."
-    python3 lib/knobert-daemon.py || true
-
-    echo "[$(date)] Daemon exited. Restarting in ${RESTART_DELAY}s..."
-    sleep "${RESTART_DELAY}"
-
-    # Pull latest code on restart
-    git pull --ff-only 2>/dev/null || true
-  done
+  # Dispatch based on role — worker runs the task poller, head runs the daemon.
+  # One brain, many tentacles. Arms sense and execute, they don't think.
+  case "${ROLE}" in
+    worker)
+      while true; do
+        echo "[$(date)] Starting worker..."
+        python3 lib/knobert-worker.py || true
+        echo "[$(date)] Worker exited. Restarting in ${RESTART_DELAY}s..."
+        sleep "${RESTART_DELAY}"
+        git pull --ff-only 2>/dev/null || true
+      done
+      ;;
+    head|secondary-head)
+      export KNOBERT_HEAD_MODE="${ROLE}"
+      [ "${ROLE}" = "secondary-head" ] && export KNOBERT_HEAD_MODE="secondary"
+      while true; do
+        echo "[$(date)] Starting daemon (${ROLE})..."
+        python3 lib/knobert-daemon.py || true
+        echo "[$(date)] Daemon exited. Restarting in ${RESTART_DELAY}s..."
+        sleep "${RESTART_DELAY}"
+        git pull --ff-only 2>/dev/null || true
+      done
+      ;;
+    *)
+      echo "ERROR: Unknown ROLE '${ROLE}'. Use 'worker', 'head', or 'secondary-head'."
+      exit 1
+      ;;
+  esac
 }
 
 # ============================================================
