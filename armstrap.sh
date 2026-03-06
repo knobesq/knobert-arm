@@ -82,7 +82,7 @@ wait_backoff() {
 pull_image() {
   # Try ghcr.io first (no rate limits for public images)
   echo "Pulling from ghcr.io..."
-  if docker pull "${GHCR_IMAGE}" 2>/dev/null; then
+  if docker pull --platform linux/amd64 "${GHCR_IMAGE}" 2>/dev/null; then
     DOCKER_IMAGE="${GHCR_IMAGE}"
     clear_backoff
     return 0
@@ -90,7 +90,7 @@ pull_image() {
 
   # Fallback to Docker Hub
   echo "ghcr.io failed, trying Docker Hub..."
-  if docker pull "${HUB_IMAGE}" 2>/dev/null; then
+  if docker pull --platform linux/amd64 "${HUB_IMAGE}" 2>/dev/null; then
     DOCKER_IMAGE="${HUB_IMAGE}"
     clear_backoff
     return 0
@@ -375,7 +375,7 @@ run_docker() {
     fi
 
     echo "[$(date)] Starting container (${ROLE})..."
-    docker run --rm \
+    docker run --rm --platform linux/amd64 \
       --name "${INSTANCE_ID}" \
       -e GAS_BRIDGE_KEY="${BRIDGE_KEY}" \
       -e KNOBERT_ROLE="${ROLE}" \
