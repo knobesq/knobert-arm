@@ -17,7 +17,7 @@ ARMSTRAP_VERSION="2026.03.05.7"  # Bump this on every change
 
 BRIDGE_KEY="${BRIDGE_KEY:?ERROR: Set BRIDGE_KEY environment variable}"
 MODE="${MODE:-docker}"  # docker | bare
-ROLE="${ROLE:-worker}"  # worker | secondary-head | head
+ROLE="${ROLE:-worker}"  # worker | arm | secondary-head | head
 INSTANCE_ID="${INSTANCE_ID:-knobert-$(hostname | tr '.' '-')-$$}"
 MODEL="${MODEL:-}"
 RESTART_DELAY="${RESTART_DELAY:-30}"
@@ -322,6 +322,21 @@ print(c.get('${key}',''))" 2>/dev/null || echo "")
         git pull --ff-only 2>/dev/null || true
       done
       ;;
+    arm)
+      while true; do
+        echo "[$(date)] Starting arm agent..."
+        python3 lib/knobert_arm_agent.py &
+        CHILD_PID=$!
+        wait "${CHILD_PID}" || true
+        CHILD_PID=""
+        echo "[$(date)] Arm agent exited. Restarting in ${RESTART_DELAY}s..."
+        sleep "${RESTART_DELAY}" &
+        CHILD_PID=$!
+        wait "${CHILD_PID}" 2>/dev/null || true
+        CHILD_PID=""
+        git pull --ff-only 2>/dev/null || true
+      done
+      ;;
     head|secondary-head)
       export KNOBERT_HEAD_MODE="${ROLE}"
       [ "${ROLE}" = "secondary-head" ] && export KNOBERT_HEAD_MODE="secondary"
@@ -340,7 +355,7 @@ print(c.get('${key}',''))" 2>/dev/null || echo "")
       done
       ;;
     *)
-      echo "ERROR: Unknown ROLE '${ROLE}'. Use 'worker', 'head', or 'secondary-head'."
+      echo "ERROR: Unknown ROLE '${ROLE}'. Use 'worker', 'arm', 'head', or 'secondary-head'."
       exit 1
       ;;
   esac
