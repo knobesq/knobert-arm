@@ -324,12 +324,12 @@ print(c.get('${key}',''))" 2>/dev/null || echo "")
       ;;
     arm)
       while true; do
-        echo "[$(date)] Starting arm agent..."
-        python3 lib/knobert_arm_agent.py &
+        echo "[$(date)] Starting tentacle agent..."
+        python3 lib/knobert_tentacle_agent.py &
         CHILD_PID=$!
         wait "${CHILD_PID}" || true
         CHILD_PID=""
-        echo "[$(date)] Arm agent exited. Restarting in ${RESTART_DELAY}s..."
+        echo "[$(date)] Tentacle agent exited. Restarting in ${RESTART_DELAY}s..."
         sleep "${RESTART_DELAY}" &
         CHILD_PID=$!
         wait "${CHILD_PID}" 2>/dev/null || true
